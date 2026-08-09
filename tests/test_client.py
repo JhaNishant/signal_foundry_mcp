@@ -194,6 +194,82 @@ async def test_chat_session_handles_text_only_and_full_tool_loop() -> None:
 
 
 @pytest.mark.asyncio
+async def test_chat_session_returns_a_text_only_completion() -> None:
+    claude = FakeClaude([response(text_block("DeepInfra lists $0.32 per million input tokens."))])
+    chat = ChatSession(
+        {"sqlite": FakeServer([]), "llm_inference": FakeServer([]), "filesystem": FakeServer([])},
+        claude,
+    )  # type: ignore[arg-type]
+    await chat.prepare_tools()
+
+    answer = await chat.process_query("What does DeepInfra charge for DeepSeek V3?")
+
+    assert answer == "DeepInfra lists $0.32 per million input tokens."
+    assert len(claude.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_mocked_scrape_to_database_to_answer_workflow() -> None:
+    sqlite = FakeServer([], {"write_query": "ok"})
+    scraper = FakeServer(
+        [
+            {"name": "scrape_websites", "description": "Scrape provider pages", "input_schema": {}},
+            {"name": "extract_scraped_info", "description": "Read saved sources", "input_schema": {}},
+        ],
+        {
+            "scrape_websites": "['deepinfra']",
+            "extract_scraped_info": json.dumps(
+                {
+                    "provider_name": "deepinfra",
+                    "content": {"markdown": "DeepSeek V3 input $0.32, output $0.89."},
+                }
+            ),
+        },
+    )
+    pricing_data = json.dumps(
+        {
+            "company_name": "DeepInfra",
+            "plans": [
+                {
+                    "plan_name": "DeepSeek V3",
+                    "input_tokens": 0.32,
+                    "output_tokens": 0.89,
+                    "currency": "USD",
+                    "billing_period": "per million tokens",
+                    "features": ["serverless"],
+                    "limitations": "None stated",
+                }
+            ],
+        }
+    )
+    claude = FakeClaude(
+        [
+            response(
+                tool_block(
+                    "scrape_websites",
+                    "tool_1",
+                    {"websites": {"deepinfra": "https://deepinfra.com/pricing"}},
+                )
+            ),
+            response(text_block(pricing_data)),
+            response(text_block("DeepInfra charges $0.32 input and $0.89 output per million tokens.")),
+        ]
+    )
+    chat = ChatSession(
+        {"sqlite": sqlite, "llm_inference": scraper, "filesystem": FakeServer([])}, claude
+    )  # type: ignore[arg-type]
+    await chat.prepare_tools()
+
+    answer = await chat.process_query("Scrape DeepInfra, then find the DeepSeek V3 price.")
+
+    assert answer == "DeepInfra charges $0.32 input and $0.89 output per million tokens."
+    assert [name for name, _ in scraper.calls] == ["scrape_websites", "extract_scraped_info"]
+    write_queries = [arguments["query"] for name, arguments in sqlite.calls if name == "write_query"]
+    assert any("DeepInfra" in query and "DeepSeek V3" in query for query in write_queries)
+    assert len(claude.calls) == 3
+
+
+@pytest.mark.asyncio
 async def test_show_stored_data_prints_required_rows(capsys: pytest.CaptureFixture[str]) -> None:
     rows = "[{'company_name': 'DeepInfra', 'plan_name': 'DeepSeek V3', " \
            "'input_tokens': 0.27, 'output_tokens': 1.1, 'currency': 'USD'}]"

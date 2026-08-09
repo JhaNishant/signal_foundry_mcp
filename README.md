@@ -46,6 +46,13 @@ uv run python starter_client.py
 
 The client starts the custom scraper, SQLite, and filesystem MCP servers from `server_config.json`.
 
+## Practical safeguards
+
+Saved pages are reused for 24 hours, so a follow up question does not spend another
+Firecrawl credit. The scraper also supports `force: true` when a fresh page is needed.
+Short retries help with temporary network errors, while a failed provider does not stop
+the remaining sites from finishing.
+
 ## Example prompts
 
 ```text
@@ -62,7 +69,8 @@ show data
 uv run pytest
 ```
 
-The test suite checks scraper persistence, retrieval, MCP retries, database writes, Claude tool use, terminal data display, and a mocked scrape to answer workflow.
+The test suite checks scraper persistence, cache refreshes, retrieval, MCP retries,
+database writes, Claude tool use, terminal data display, and a mocked scrape to answer workflow.
 
 ## Limits
 

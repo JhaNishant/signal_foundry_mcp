@@ -82,6 +82,29 @@ def test_scrape_persists_each_format_and_metadata(
     assert fake.calls.count(cloudrift) == 1
 
 
+def test_force_refresh_bypasses_the_fresh_cache(
+    isolated_storage: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = "https://www.cloudrift.ai/inference"
+    fake = FakeFirecrawl(
+        {
+            url: {
+                "success": True,
+                "markdown": "fresh pricing page",
+                "html": "<p>fresh pricing page</p>",
+                "metadata": {},
+            }
+        }
+    )
+    monkeypatch.setattr(server, "_firecrawl_client", fake)
+
+    server.scrape_websites_impl({"cloudrift": url})
+    server.scrape_websites_impl({"cloudrift": url})
+    server.scrape_websites_impl({"cloudrift": url}, force=True)
+
+    assert fake.calls.count(url) == 2
+
+
 def test_scrape_failure_does_not_block_other_sites(
     isolated_storage: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -1,5 +1,8 @@
 # Signal Foundry MCP evidence
 
+Before submitting, add the three local terminal screenshots above their matching
+transcript. The transcripts keep the exact live commands and output visible until then.
+
 The following terminal transcripts were captured from the live run on August 9, 2026.
 They contain the required queries and actual application output. No keys are included.
 
