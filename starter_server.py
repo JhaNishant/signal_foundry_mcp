@@ -28,7 +28,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 SCRAPE_DIR = Path(os.getenv("SCRAPE_DIR", "scraped_content"))
-METADATA_FILE = Path(os.getenv("SCRAPED_METADATA_FILE", str(SCRAPE_DIR / "scraped_metadata.json")))
+METADATA_FILE = Path(os.getenv("SCRAPED_METADATA_FILE", "scraped_metadata.json"))
 CACHE_TTL_HOURS = int(os.getenv("SCRAPE_CACHE_TTL_HOURS", "24"))
 SCRAPE_FORMATS = ("markdown", "html")
 

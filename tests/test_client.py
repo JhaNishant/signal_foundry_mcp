@@ -209,6 +209,35 @@ async def test_chat_session_returns_a_text_only_completion() -> None:
 
 
 @pytest.mark.asyncio
+async def test_chat_session_reuses_saved_data_for_a_deepseek_comparison() -> None:
+    rows = json.dumps(
+        [
+            {
+                "company_name": "DeepInfra",
+                "plan_name": "DeepSeek-V3",
+                "input_tokens": 0.32,
+                "output_tokens": 0.89,
+                "currency": "USD",
+                "billing_period": "per million tokens",
+            }
+        ]
+    )
+    sqlite = FakeServer([], {"read_query": rows, "write_query": "ok"})
+    claude = FakeClaude([])
+    chat = ChatSession(
+        {"sqlite": sqlite, "llm_inference": FakeServer([]), "filesystem": FakeServer([])}, claude
+    )  # type: ignore[arg-type]
+    await chat.prepare_tools()
+
+    answer = await chat.process_query("Compare CloudRift AI and DeepInfra's costs for DeepSeek V3")
+
+    assert "CloudRift: no matching DeepSeek V3 price is stored." in answer
+    assert "DeepInfra: USD $0.32 input and $0.89 output per million tokens." in answer
+    assert len(claude.calls) == 0
+    assert any(name == "read_query" for name, _ in sqlite.calls)
+
+
+@pytest.mark.asyncio
 async def test_mocked_scrape_to_database_to_answer_workflow() -> None:
     sqlite = FakeServer([], {"write_query": "ok"})
     scraper = FakeServer(

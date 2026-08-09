@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 from contextlib import AsyncExitStack
 from datetime import timedelta
@@ -316,7 +317,74 @@ not support a precise comparison. Never invent a price."""
             except Exception as error:
                 logger.warning("Could not extract pricing for %s: %s", provider_name, error)
 
+    async def _stored_comparison(self, query: str) -> str | None:
+        """Answer a narrow saved price comparison before spending credits on new research."""
+        query_lower = query.lower()
+        providers = {
+            "cloudrift": "CloudRift",
+            "deepinfra": "DeepInfra",
+            "fireworks": "Fireworks",
+            "groq": "Groq",
+        }
+        requested_providers = [display for key, display in providers.items() if key in query_lower]
+        if len(requested_providers) != 2 or "deepseek" not in query_lower:
+            return None
+
+        escaped_providers = ", ".join(f"'{_sql_value(name)}'" for name in requested_providers)
+        result = await self.sqlite_server.execute_tool(
+            "read_query",
+            {
+                "query": (
+                    "SELECT company_name, plan_name, input_tokens, output_tokens, currency, billing_period "
+                    f"FROM pricing_plans WHERE company_name IN ({escaped_providers})"
+                )
+            },
+        )
+        raw_text = _result_text(result)
+        try:
+            rows = json.loads(raw_text)
+        except json.JSONDecodeError:
+            try:
+                rows = ast.literal_eval(raw_text)
+            except (SyntaxError, ValueError):
+                return None
+        if isinstance(rows, dict):
+            rows = rows.get("results", rows.get("rows", []))
+        if not isinstance(rows, list):
+            return None
+
+        requested_model = "deepseek v3" if "deepseek v3" in query_lower else "deepseek"
+        matching_rows: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            normalised_plan = re.sub(r"[^a-z0-9]+", " ", str(row.get("plan_name", "")).lower()).strip()
+            if normalised_plan != requested_model:
+                continue
+            matching_rows.setdefault(str(row.get("company_name", "")), row)
+        if not matching_rows:
+            return None
+
+        lines = ["Saved pricing comparison for DeepSeek V3:", ""]
+        for provider in requested_providers:
+            row = matching_rows.get(provider)
+            if row is None:
+                lines.append(f"{provider}: no matching DeepSeek V3 price is stored.")
+                continue
+            currency = row.get("currency", "USD")
+            billing_period = row.get("billing_period", "per million tokens")
+            lines.append(
+                f"{provider}: {currency} ${row['input_tokens']} input and ${row['output_tokens']} "
+                f"output {billing_period}."
+            )
+        lines.append("")
+        lines.append("The saved data does not support a direct token price comparison when one provider has no matching model entry.")
+        return "\n".join(lines)
+
     async def process_query(self, query: str) -> str:
+        stored_comparison = await self._stored_comparison(query)
+        if stored_comparison:
+            return stored_comparison
         messages: list[dict[str, Any]] = [{"role": "user", "content": query}]
         full_response = ""
         process_query = True

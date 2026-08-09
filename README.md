@@ -51,7 +51,8 @@ The client starts the custom scraper, SQLite, and filesystem MCP servers from `s
 Saved pages are reused for 24 hours, so a follow up question does not spend another
 Firecrawl credit. The scraper also supports `force: true` when a fresh page is needed.
 Short retries help with temporary network errors, while a failed provider does not stop
-the remaining sites from finishing.
+the remaining sites from finishing. A saved DeepSeek comparison uses matching SQLite rows
+first, which keeps repeat questions quick and avoids another scrape.
 
 ## Example prompts
 

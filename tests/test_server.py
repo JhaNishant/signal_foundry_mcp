@@ -16,6 +16,10 @@ class FakeScrapeResult:
         return self.payload
 
 
+def test_default_metadata_file_is_in_the_project_root() -> None:
+    assert server.METADATA_FILE == Path("scraped_metadata.json")
+
+
 class FakeFirecrawl:
     def __init__(self, responses: dict[str, object]):
         self.responses = responses
