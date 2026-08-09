@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+scraped_content/
+scraped_metadata.json
+pricescout.db
+test.db
+mcp_project_submission.zip
+*.DS_Store
