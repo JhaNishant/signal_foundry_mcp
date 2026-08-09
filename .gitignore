@@ -8,5 +8,6 @@ scraped_metadata.json
 pricescout.db
 test.db
 mcp_project_submission.zip
+mcp_project_submission/
 evidence_assets/*.txt
 *.DS_Store
